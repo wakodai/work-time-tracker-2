@@ -16,7 +16,7 @@ import { toast } from "@/hooks/use-toast"
 interface WorkRecord {
   id: string
   datetime: string
-  isStart: boolean
+  actionType: "start" | "stop" | "break"
   description: string
 }
 
@@ -46,7 +46,7 @@ export default function WorkTimeTracker() {
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newRecord, setNewRecord] = useState<Partial<WorkRecord>>({
     datetime: "",
-    isStart: true,
+    actionType: "start",
     description: "",
   })
 
@@ -114,7 +114,7 @@ export default function WorkTimeTracker() {
   const startAddingNew = () => {
     setNewRecord({
       datetime: getCurrentDateTime(),
-      isStart: true,
+      actionType: "start",
       description: "",
     })
     setIsAddingNew(true)
@@ -133,7 +133,7 @@ export default function WorkTimeTracker() {
     const record: WorkRecord = {
       id: Date.now().toString(),
       datetime: newRecord.datetime,
-      isStart: newRecord.isStart ?? true,
+      actionType: newRecord.actionType ?? "start",
       description: newRecord.description ?? "",
     }
 
@@ -141,13 +141,13 @@ export default function WorkTimeTracker() {
     setIsAddingNew(false)
     setNewRecord({
       datetime: "",
-      isStart: true,
+      actionType: "start",
       description: "",
     })
 
     toast({
       title: "記録を追加しました",
-      description: `${record.isStart ? "START" : "STOP"}`,
+      description: record.actionType === "start" ? "START" : record.actionType === "break" ? "BREAK" : "STOP",
     })
   }
 
@@ -172,7 +172,7 @@ export default function WorkTimeTracker() {
           ? {
               ...record,
               datetime: editForm.datetime!,
-              isStart: editForm.isStart!,
+              actionType: editForm.actionType!,
               description: editForm.description!,
             }
           : record,
@@ -337,8 +337,17 @@ export default function WorkTimeTracker() {
       const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`
       const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 
-      const action = record.isStart ? "START()" : "STOP()"
-      const description = record.description || ""
+      let action = ""
+      let description = record.description || ""
+
+      if (record.actionType === "start") {
+        action = "START()"
+      } else if (record.actionType === "stop") {
+        action = "STOP()"
+      } else if (record.actionType === "break") {
+        action = `BREAK(${description})`
+        description = ""
+      }
 
       tsvLines.push(`${dateStr} ${timeStr}\t${action}\t${description}`)
     })
@@ -376,8 +385,18 @@ export default function WorkTimeTracker() {
       const date = new Date(record.datetime)
       const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`
       const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-      const action = record.isStart ? "START()" : "STOP()"
-      const description = record.description || ""
+
+      let action = ""
+      let description = record.description || ""
+
+      if (record.actionType === "start") {
+        action = "START()"
+      } else if (record.actionType === "stop") {
+        action = "STOP()"
+      } else if (record.actionType === "break") {
+        action = `BREAK(${description})`
+        description = ""
+      }
 
       htmlTable += `
 <tr>
@@ -431,8 +450,11 @@ export default function WorkTimeTracker() {
       if (field === "datetime") {
         return formatDateTime(record.datetime)
       }
-      if (field === "isStart") {
-        return <Badge variant={record.isStart ? "default" : "secondary"}>{record.isStart ? "START" : "STOP"}</Badge>
+      if (field === "actionType") {
+        const variant =
+          record.actionType === "start" ? "default" : record.actionType === "break" ? "secondary" : "outline"
+        const text = record.actionType === "start" ? "START" : record.actionType === "break" ? "BREAK" : "STOP"
+        return <Badge variant={variant}>{text}</Badge>
       }
       return record[field]
     }
@@ -457,29 +479,37 @@ export default function WorkTimeTracker() {
           </div>
         )
       case "select":
-        if (field === "isStart") {
+        if (field === "actionType") {
           return (
             <div className="flex gap-1">
               <Button
                 size="sm"
-                variant={editForm.isStart ? "default" : "outline"}
-                onClick={() => setEditForm({ ...editForm, isStart: true, description: "" })}
+                variant={editForm.actionType === "start" ? "default" : "outline"}
+                onClick={() => setEditForm({ ...editForm, actionType: "start", description: "" })}
               >
                 START
               </Button>
               <Button
                 size="sm"
-                variant={!editForm.isStart ? "default" : "outline"}
-                onClick={() => setEditForm({ ...editForm, isStart: false })}
+                variant={editForm.actionType === "stop" ? "default" : "outline"}
+                onClick={() => setEditForm({ ...editForm, actionType: "stop", description: "" })}
               >
                 STOP
+              </Button>
+              <Button
+                size="sm"
+                variant={editForm.actionType === "break" ? "default" : "outline"}
+                onClick={() => setEditForm({ ...editForm, actionType: "break", description: "" })}
+              >
+                BREAK
               </Button>
             </div>
           )
         }
         break
       case "textarea":
-        const isStartMode = editForm.isStart
+        const isStartMode = editForm.actionType === "start"
+        const isBreakMode = editForm.actionType === "break"
         return (
           <div>
             <Input
@@ -489,7 +519,13 @@ export default function WorkTimeTracker() {
               onKeyDown={(e) => handleWorkContentKeyDown(e, false)}
               className="min-w-48"
               disabled={isStartMode}
-              placeholder={isStartMode ? "START時は入力不可" : "作業内容を入力（Enterで保存）"}
+              placeholder={
+                isStartMode
+                  ? "START時は入力不可"
+                  : isBreakMode
+                    ? "休憩時間を(nn)形式で入力（Enterで保存）"
+                    : "作業内容を入力（Enterで保存）"
+              }
             />
             <datalist id="work-contents">
               {workContents.map((content) => (
@@ -608,7 +644,7 @@ export default function WorkTimeTracker() {
                       {editingRecord !== record.id && <GripVertical className="h-4 w-4 text-muted-foreground" />}
                     </TableCell>
                     <TableCell>{renderEditableCell(record, "datetime", "datetime")}</TableCell>
-                    <TableCell>{renderEditableCell(record, "isStart", "select")}</TableCell>
+                    <TableCell>{renderEditableCell(record, "actionType", "select")}</TableCell>
                     <TableCell>{renderEditableCell(record, "description", "textarea")}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -659,19 +695,26 @@ export default function WorkTimeTracker() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button className=""
+                        <Button
                           size="sm"
-                          variant={newRecord.isStart ? "default" : "outline"}
-                          onClick={() => setNewRecord({ ...newRecord, isStart: true, description: "" })}
+                          variant={newRecord.actionType === "start" ? "default" : "outline"}
+                          onClick={() => setNewRecord({ ...newRecord, actionType: "start", description: "" })}
                         >
                           START
                         </Button>
                         <Button
                           size="sm"
-                          variant={!newRecord.isStart ? "default" : "outline"}
-                          onClick={() => setNewRecord({ ...newRecord, isStart: false })}
+                          variant={newRecord.actionType === "stop" ? "default" : "outline"}
+                          onClick={() => setNewRecord({ ...newRecord, actionType: "stop", description: "" })}
                         >
                           STOP
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={newRecord.actionType === "break" ? "default" : "outline"}
+                          onClick={() => setNewRecord({ ...newRecord, actionType: "break", description: "" })}
+                        >
+                          BREAK
                         </Button>
                       </div>
                     </TableCell>
@@ -679,12 +722,18 @@ export default function WorkTimeTracker() {
                       <div>
                         <Input
                           list="work-contents-new"
-                          placeholder={newRecord.isStart ? "START時は入力不可" : "作業内容を入力（Enterで保存）"}
+                          placeholder={
+                            newRecord.actionType === "start"
+                              ? "START時は入力不可"
+                              : newRecord.actionType === "break"
+                                ? "休憩時間を(nn)形式で入力（Enterで保存）"
+                                : "作業内容を入力（Enterで保存）"
+                          }
                           value={newRecord.description}
                           onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
                           onKeyDown={(e) => handleWorkContentKeyDown(e, true)}
                           className="min-w-48"
-                          disabled={newRecord.isStart}
+                          disabled={newRecord.actionType === "start"}
                         />
                         <datalist id="work-contents-new">
                           {workContents.map((content) => (
