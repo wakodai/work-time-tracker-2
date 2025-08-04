@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical } from "lucide-react"
+import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical, ExternalLink } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 interface WorkRecord {
@@ -429,6 +429,21 @@ export default function WorkTimeTracker() {
     }
   }
 
+  const openWagePage = () => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+    const yearMonth = `${year}${month}`
+
+    const wageUrl = `https://kurusugawa.jp/confluence/display/~wako_daisuke/wage_${yearMonth}`
+    window.open(wageUrl, "_blank")
+
+    toast({
+      title: "wageページを開きました",
+      description: `wage_${yearMonth}`,
+    })
+  }
+
   const clearAll = () => {
     setRecords([])
     setSummaryText("")
@@ -782,6 +797,10 @@ export default function WorkTimeTracker() {
             <Button onClick={copyAsHTMLTable} variant="outline">
               <Copy className="h-4 w-4 mr-2" />
               HTMLテーブルでコピー
+            </Button>
+            <Button onClick={openWagePage} variant="outline">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              wageページ
             </Button>
             <Button onClick={clearAll} variant="outline">
               <RotateCcw className="h-4 w-4 mr-2" />
