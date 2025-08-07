@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical, ExternalLink } from "lucide-react"
+import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical, ExternalLink } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 
 interface WorkRecord {
@@ -53,6 +53,9 @@ export default function WorkTimeTracker() {
   // Drag and drop states
   const [draggedRecord, setDraggedRecord] = useState<string | null>(null)
   const [dragOverRecord, setDragOverRecord] = useState<string | null>(null)
+
+  // IME input states
+  const [isComposing, setIsComposing] = useState(false)
 
   useEffect(() => {
     // Load data from localStorage
@@ -306,7 +309,7 @@ export default function WorkTimeTracker() {
 
   // Handle Enter key press for work content input
   const handleWorkContentKeyDown = (e: React.KeyboardEvent, isNewRecord = false) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !isComposing) {
       e.preventDefault()
       if (isNewRecord) {
         saveNewRecord()
@@ -314,6 +317,15 @@ export default function WorkTimeTracker() {
         saveEdit()
       }
     }
+  }
+
+  // Handle IME composition events
+  const handleCompositionStart = () => {
+    setIsComposing(true)
+  }
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false)
   }
 
   const generateTSVDump = () => {
@@ -532,6 +544,8 @@ export default function WorkTimeTracker() {
               value={value as string}
               onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
               onKeyDown={(e) => handleWorkContentKeyDown(e, false)}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               className="min-w-48"
               disabled={isStartMode}
               placeholder={
@@ -747,6 +761,8 @@ export default function WorkTimeTracker() {
                           value={newRecord.description}
                           onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
                           onKeyDown={(e) => handleWorkContentKeyDown(e, true)}
+                          onCompositionStart={handleCompositionStart}
+                          onCompositionEnd={handleCompositionEnd}
                           className="min-w-48"
                           disabled={newRecord.actionType === "start"}
                         />
