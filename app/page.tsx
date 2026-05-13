@@ -12,18 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical, ExternalLink } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
-
-interface WorkRecord {
-  id: string
-  datetime: string
-  actionType: "start" | "stop" | "break"
-  description: string
-}
-
-interface WorkContent {
-  id: string
-  content: string
-}
+import { WorkContentInput } from "@/components/work-content-input"
+import {
+  calculateTotalWorkMinutes,
+  formatMinutesAsHHMM,
+  type WorkRecord,
+} from "@/lib/work-time"
+import type { WorkContent } from "@/lib/work-content-suggest"
 
 export default function WorkTimeTracker() {
   const [records, setRecords] = useState<WorkRecord[]>([])
@@ -53,9 +48,6 @@ export default function WorkTimeTracker() {
   // Drag and drop states
   const [draggedRecord, setDraggedRecord] = useState<string | null>(null)
   const [dragOverRecord, setDragOverRecord] = useState<string | null>(null)
-
-  // IME input states
-  const [isComposing, setIsComposing] = useState(false)
 
   useEffect(() => {
     // Load data from localStorage
@@ -307,27 +299,6 @@ export default function WorkTimeTracker() {
     })
   }
 
-  // Handle Enter key press for work content input
-  const handleWorkContentKeyDown = (e: React.KeyboardEvent, isNewRecord = false) => {
-    if (e.key === "Enter" && !isComposing) {
-      e.preventDefault()
-      if (isNewRecord) {
-        saveNewRecord()
-      } else {
-        saveEdit()
-      }
-    }
-  }
-
-  // Handle IME composition events
-  const handleCompositionStart = () => {
-    setIsComposing(true)
-  }
-
-  const handleCompositionEnd = () => {
-    setIsComposing(false)
-  }
-
   const generateTSVDump = () => {
     if (records.length === 0) {
       toast({
@@ -538,30 +509,21 @@ export default function WorkTimeTracker() {
         const isStartMode = editForm.actionType === "start"
         const isBreakMode = editForm.actionType === "break"
         return (
-          <div>
-            <Input
-              list="work-contents"
-              value={value as string}
-              onChange={(e) => setEditForm({ ...editForm, [field]: e.target.value })}
-              onKeyDown={(e) => handleWorkContentKeyDown(e, false)}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              className="min-w-48"
-              disabled={isStartMode}
-              placeholder={
-                isStartMode
-                  ? "START時は入力不可"
-                  : isBreakMode
-                    ? "休憩時間を(nn)形式で入力（Enterで保存）"
-                    : "作業内容を入力（Enterで保存）"
-              }
-            />
-            <datalist id="work-contents">
-              {workContents.map((content) => (
-                <option key={content.id} value={content.content} />
-              ))}
-            </datalist>
-          </div>
+          <WorkContentInput
+            value={(value as string) ?? ""}
+            onChange={(next) => setEditForm({ ...editForm, [field]: next })}
+            onSubmit={saveEdit}
+            contents={isBreakMode ? [] : workContents}
+            inputClassName="min-w-48"
+            disabled={isStartMode}
+            placeholder={
+              isStartMode
+                ? "START時は入力不可"
+                : isBreakMode
+                  ? "休憩時間を(nn)形式で入力（Enterで保存）"
+                  : "作業内容を入力（Enterで保存）"
+            }
+          />
         )
       default:
         return (
@@ -575,6 +537,8 @@ export default function WorkTimeTracker() {
   }
 
   const sortedRecords = [...records].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
+  const totalWorkMinutes = calculateTotalWorkMinutes(records)
+  const totalWorkHHMM = formatMinutesAsHHMM(totalWorkMinutes)
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -583,11 +547,19 @@ export default function WorkTimeTracker() {
       {/* Main Table */}
       <Card className="mb-6">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
               作業記録
             </CardTitle>
+            <div
+              className="flex items-center gap-2 text-sm font-medium tabular-nums"
+              data-testid="total-work-time"
+              aria-label="総作業時間"
+            >
+              <span className="text-muted-foreground">総作業時間</span>
+              <span className="text-lg font-bold">{totalWorkHHMM}</span>
+            </div>
             <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -748,30 +720,21 @@ export default function WorkTimeTracker() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <Input
-                          list="work-contents-new"
-                          placeholder={
-                            newRecord.actionType === "start"
-                              ? "START時は入力不可"
-                              : newRecord.actionType === "break"
-                                ? "休憩時間を(nn)形式で入力（Enterで保存）"
-                                : "作業内容を入力（Enterで保存）"
-                          }
-                          value={newRecord.description}
-                          onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
-                          onKeyDown={(e) => handleWorkContentKeyDown(e, true)}
-                          onCompositionStart={handleCompositionStart}
-                          onCompositionEnd={handleCompositionEnd}
-                          className="min-w-48"
-                          disabled={newRecord.actionType === "start"}
-                        />
-                        <datalist id="work-contents-new">
-                          {workContents.map((content) => (
-                            <option key={content.id} value={content.content} />
-                          ))}
-                        </datalist>
-                      </div>
+                      <WorkContentInput
+                        value={newRecord.description ?? ""}
+                        onChange={(next) => setNewRecord({ ...newRecord, description: next })}
+                        onSubmit={saveNewRecord}
+                        contents={newRecord.actionType === "break" ? [] : workContents}
+                        inputClassName="min-w-48"
+                        disabled={newRecord.actionType === "start"}
+                        placeholder={
+                          newRecord.actionType === "start"
+                            ? "START時は入力不可"
+                            : newRecord.actionType === "break"
+                              ? "休憩時間を(nn)形式で入力（Enterで保存）"
+                              : "作業内容を入力（Enterで保存）"
+                        }
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">

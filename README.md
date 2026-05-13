@@ -1,30 +1,24 @@
-# Time tracking app
+# 作業時間記録システム (work-time-tracker-2)
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+Next.js 製の作業時間トラッカー。START / STOP / BREAK の3アクションで作業記録を取り、TSV ダンプや HTML テーブルのコピー機能、wage ページ起動、そして総作業時間の自動計算機能を提供します。
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/wakodais-projects/v0-time-tracking-app)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/oPiiVPgv4uB)
+## 機能
 
-## Overview
+- 作業記録の追加・編集・削除・ドラッグ並べ替え
+- 作業内容のマスター管理（追加/編集/削除）
+- 作業内容入力時のオートコンプリート（矢印キーで候補選択、Enter / Tab で確定挿入）
+- 総作業時間の自動計算と表示
+- TSV ダンプおよび HTML テーブルでのコピー（Confluence 等への貼り付け用）
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## 開発
 
-## Deployment
+```bash
+pnpm install
+pnpm dev      # 開発サーバ
+pnpm test     # ユニットテスト（Vitest）
+pnpm build    # 静的エクスポート（out/）
+```
 
-Your project is live at:
+## デプロイ
 
-**[https://vercel.com/wakodais-projects/v0-time-tracking-app](https://vercel.com/wakodais-projects/v0-time-tracking-app)**
-
-## Build your app
-
-Continue building your app on:
-
-**[https://v0.dev/chat/projects/oPiiVPgv4uB](https://v0.dev/chat/projects/oPiiVPgv4uB)**
-
-## How It Works
-
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+`main` ブランチに push すると、GitHub Actions が静的サイトを生成し GitHub Pages に自動デプロイします。`vercel.json` の `git.deploymentEnabled: false` により Vercel の自動デプロイは停止しています。
