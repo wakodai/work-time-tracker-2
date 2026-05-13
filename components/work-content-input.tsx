@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
@@ -22,6 +23,12 @@ interface WorkContentInputProps
   inputClassName?: string
 }
 
+interface DropdownPosition {
+  top: number
+  left: number
+  width: number
+}
+
 export function WorkContentInput({
   value,
   onChange,
@@ -37,12 +44,20 @@ export function WorkContentInput({
   const [highlighted, setHighlighted] = React.useState(-1)
   const [isComposing, setIsComposing] = React.useState(false)
   const [caret, setCaret] = React.useState(0)
+  const [position, setPosition] = React.useState<DropdownPosition | null>(null)
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const token = React.useMemo(() => getCurrentToken(value, caret), [value, caret])
   const suggestions = React.useMemo(
     () => filterSuggestions(contents, token.token),
     [contents, token.token],
   )
+
+  const shouldShow = open && suggestions.length > 0 && !disabled
 
   React.useEffect(() => {
     if (suggestions.length === 0) {
@@ -54,6 +69,29 @@ export function WorkContentInput({
       )
     }
   }, [suggestions])
+
+  const updatePosition = React.useCallback(() => {
+    const input = inputRef.current
+    if (!input) return
+    const rect = input.getBoundingClientRect()
+    setPosition({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    })
+  }, [])
+
+  React.useEffect(() => {
+    if (!shouldShow) return
+    updatePosition()
+    const handle = () => updatePosition()
+    window.addEventListener("scroll", handle, true)
+    window.addEventListener("resize", handle)
+    return () => {
+      window.removeEventListener("scroll", handle, true)
+      window.removeEventListener("resize", handle)
+    }
+  }, [shouldShow, updatePosition])
 
   const applySuggestion = (suggestion: WorkContent) => {
     const result = replaceTokenAt(
@@ -125,6 +163,42 @@ export function WorkContentInput({
     setOpen(true)
   }
 
+  const dropdown =
+    shouldShow && position && mounted ? (
+      <ul
+        id="work-content-suggestions"
+        role="listbox"
+        style={{
+          position: "fixed",
+          top: position.top,
+          left: position.left,
+          width: position.width,
+        }}
+        className="z-[1000] max-h-56 overflow-y-auto rounded-md border bg-popover p-1 text-sm shadow-md"
+      >
+        {suggestions.map((suggestion, index) => (
+          <li
+            key={suggestion.id}
+            role="option"
+            aria-selected={index === highlighted}
+            className={cn(
+              "cursor-pointer rounded px-2 py-1",
+              index === highlighted
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent/50",
+            )}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              applySuggestion(suggestion)
+            }}
+            onMouseEnter={() => setHighlighted(index)}
+          >
+            {suggestion.content}
+          </li>
+        ))}
+      </ul>
+    ) : null
+
   return (
     <div className={cn("relative", className)}>
       <Input
@@ -156,38 +230,13 @@ export function WorkContentInput({
           inputProps.onCompositionEnd?.(event)
         }}
         aria-autocomplete="list"
-        aria-expanded={open && suggestions.length > 0}
+        aria-expanded={shouldShow}
         aria-controls="work-content-suggestions"
         autoComplete="off"
       />
-      {open && suggestions.length > 0 && !disabled && (
-        <ul
-          id="work-content-suggestions"
-          role="listbox"
-          className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-sm shadow-md"
-        >
-          {suggestions.map((suggestion, index) => (
-            <li
-              key={suggestion.id}
-              role="option"
-              aria-selected={index === highlighted}
-              className={cn(
-                "cursor-pointer rounded px-2 py-1",
-                index === highlighted
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent/50",
-              )}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                applySuggestion(suggestion)
-              }}
-              onMouseEnter={() => setHighlighted(index)}
-            >
-              {suggestion.content}
-            </li>
-          ))}
-        </ul>
-      )}
+      {mounted && dropdown
+        ? createPortal(dropdown, document.body)
+        : null}
     </div>
   )
 }
