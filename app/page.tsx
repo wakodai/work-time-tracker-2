@@ -299,6 +299,22 @@ export default function WorkTimeTracker() {
     })
   }
 
+  const copyWorkContentText = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      toast({
+        title: "コピーしました",
+        description: content,
+      })
+    } catch (error) {
+      toast({
+        title: "コピーに失敗しました",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      })
+    }
+  }
+
   const generateTSVDump = () => {
     if (records.length === 0) {
       toast({
@@ -591,6 +607,14 @@ export default function WorkTimeTracker() {
                       <div key={content.id} className="flex items-center justify-between p-2 border rounded">
                         <span>{content.content}</span>
                         <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyWorkContentText(content.content)}
+                            aria-label={`「${content.content}」をコピー`}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
