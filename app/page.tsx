@@ -14,8 +14,9 @@ import { Trash2, Edit, Plus, Clock, Copy, RotateCcw, Save, X, List, GripVertical
 import { toast } from "@/hooks/use-toast"
 import { WorkContentInput } from "@/components/work-content-input"
 import {
-  calculateTotalWorkMinutes,
-  formatMinutesAsHHMM,
+  calculateTotalWorkSeconds,
+  formatSecondsAsHHMMSS,
+  hasOpenSession,
   type WorkRecord,
 } from "@/lib/work-time"
 import type { WorkContent } from "@/lib/work-content-suggest"
@@ -49,6 +50,9 @@ export default function WorkTimeTracker() {
   const [draggedRecord, setDraggedRecord] = useState<string | null>(null)
   const [dragOverRecord, setDragOverRecord] = useState<string | null>(null)
 
+  // 現在時刻（仕事中の経過時間を秒単位で更新するため）
+  const [nowMs, setNowMs] = useState(0)
+
   useEffect(() => {
     // Load data from localStorage
     const savedRecords = localStorage.getItem("workRecords")
@@ -80,6 +84,19 @@ export default function WorkTimeTracker() {
     // Save work contents to localStorage
     localStorage.setItem("workContents", JSON.stringify(workContents))
   }, [workContents])
+
+  const isWorking = hasOpenSession(records)
+
+  useEffect(() => {
+    // 現在時刻を更新。仕事中は1秒ごとに更新して経過時間を秒単位で反映する。
+    setNowMs(Date.now())
+    if (!isWorking) return
+
+    const timer = setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [isWorking])
 
   // 現在の日時を取得（UTC+9時間として）
   const getCurrentDateTime = () => {
@@ -553,8 +570,8 @@ export default function WorkTimeTracker() {
   }
 
   const sortedRecords = [...records].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
-  const totalWorkMinutes = calculateTotalWorkMinutes(records)
-  const totalWorkHHMM = formatMinutesAsHHMM(totalWorkMinutes)
+  const totalWorkSeconds = calculateTotalWorkSeconds(records, nowMs)
+  const totalWorkHHMMSS = formatSecondsAsHHMMSS(totalWorkSeconds)
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -574,7 +591,10 @@ export default function WorkTimeTracker() {
               aria-label="総作業時間"
             >
               <span className="text-muted-foreground">総作業時間</span>
-              <span className="text-lg font-bold">{totalWorkHHMM}</span>
+              <span className="text-lg font-bold">{totalWorkHHMMSS}</span>
+              {isWorking && (
+                <span className="text-xs text-green-600 font-normal">● 計測中</span>
+              )}
             </div>
             <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
               <DialogTrigger asChild>
